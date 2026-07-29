@@ -23,7 +23,7 @@ const Vaccinations = () => {
     },
     {
       id: 3,
-      animal: "Chicken #033",
+      animal: "poultry #033",
       vaccine: "Newcastle Disease",
       dateGiven: "2026-07-15",
       nextDate: "2026-10-15",
