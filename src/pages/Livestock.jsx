@@ -232,4 +232,4 @@ const Livestock = () => {
   );
 };
 
-export default Livestock.jsx.replace(".jsx","") // keep default export clean
+export default Livestock;
