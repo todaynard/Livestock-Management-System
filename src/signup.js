@@ -1,14 +1,13 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
 
-const Login = () => {
+const Signup = () => {
   const navigate = useNavigate();
 
-  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [formData, setFormData] = useState({ email: "", password: "", confirmPassword: "" });
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
   const [errors, setErrors] = useState({});
   const [serverError, setServerError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -31,6 +30,9 @@ const Login = () => {
     } else if (formData.password.length < 6) {
       next.password = "Password must be at least 6 characters";
     }
+    if (formData.confirmPassword !== formData.password) {
+      next.confirmPassword = "Passwords do not match";
+    }
     setErrors(next);
     return Object.keys(next).length === 0;
   };
@@ -42,10 +44,14 @@ const Login = () => {
 
     setIsLoading(true);
     try {
-      await signInWithEmailAndPassword(auth, formData.email, formData.password);
-      navigate("/farmer");
+      await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      navigate("/farmer")");
     } catch (err) {
-      setServerError("Invalid email or password");
+      if (err.code === "auth/email-already-in-use") {
+        setServerError("An account with this email already exists");
+      } else {
+        setServerError("Something went wrong. Please try again.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -55,8 +61,8 @@ const Login = () => {
     <div className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-xl shadow p-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-1">Welcome back</h1>
-          <p className="text-gray-500 mb-6">Log in to your account to continue.</p>
+          <h1 className="text-3xl font-bold text-gray-800 mb-1">Create your account</h1>
+          <p className="text-gray-500 mb-6">Sign up to get started.</p>
 
           {serverError && (
             <div className="mb-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3">
@@ -81,21 +87,19 @@ const Login = () => {
                 }`}
                 placeholder="you@example.com"
               />
-              {errors.email && (
-                <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-              )}
+              {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email}</p>}
             </div>
 
-            <div className="mb-2">
+            <div className="mb-4">
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                 Password
               </label>
-              <div className="relative">D
+              <div className="relative">
                 <input
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                   value={formData.password}
                   onChange={handleChange}
                   className={`w-full rounded-lg border px-3 py-2 pr-16 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
@@ -111,24 +115,28 @@ const Login = () => {
                   {showPassword ? "Hide" : "Show"}
                 </button>
               </div>
-              {errors.password && (
-                <p className="mt-1 text-sm text-red-600">{errors.password}</p>
-              )}
+              {errors.password && <p className="mt-1 text-sm text-red-600">{errors.password}</p>}
             </div>
 
-            <div className="flex items-center justify-between mb-6 mt-3">
-              <label className="flex items-center text-sm text-gray-600">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="mr-2 rounded border-gray-300"
-                />
-                Remember me
+            <div className="mb-6">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm password
               </label>
-              <Link to="/forgot-password" className="text-sm text-blue-600 hover:underline">
-                Forgot password?
-              </Link>
+              <input
+                id="confirmPassword"
+                name="confirmPassword"
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                className={`w-full rounded-lg border px-3 py-2 text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  errors.confirmPassword ? "border-red-400" : "border-gray-300"
+                }`}
+                placeholder="••••••••"
+              />
+              {errors.confirmPassword && (
+                <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+              )}
             </div>
 
             <button
@@ -136,14 +144,14 @@ const Login = () => {
               disabled={isLoading}
               className="w-full rounded-lg bg-blue-600 text-white font-medium py-2.5 hover:bg-blue-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
             >
-              {isLoading ? "Logging in..." : "Log in"}
+              {isLoading ? "Creating account..." : "Sign up"}
             </button>
           </form>
 
           <p className="mt-6 text-center text-sm text-gray-500">
-            Don't have an account?{" "}
-            <Link to="/signup" className="text-blue-600 font-medium hover:underline">
-              Sign up
+            Already have an account?{" "}
+            <Link to="/" className="text-blue-600 font-medium hover:underline">
+              Log in
             </Link>
           </p>
         </div>
@@ -152,4 +160,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default Signup;
