@@ -1,12 +1,19 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import { db } from "../firebase";
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const Treatments = () => {
-  const [treatments, setTreatments] = useState([
-    { id: 1, animal: "Cow #12", condition: "Foot rot", medicine: "Antibiotic A", date: "2026-07-10", status: "Completed" },
-    { id: 2, animal: "Goat #5", condition: "Bloating", medicine: "Anti-bloat drench", date: "2026-07-20", status: "Ongoing" },
-  ]);
+  const [treatments, setTreatments] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     animal: "",
@@ -16,25 +23,40 @@ const Treatments = () => {
     status: "Ongoing",
   });
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "treatments"), (snapshot) => {
+      const data = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setTreatments(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.animal || !form.condition || !form.date) return;
 
-    const newTreatment = {
-      id: treatments.length ? treatments[treatments.length - 1].id + 1 : 1,
-      ...form,
-    };
+    await addDoc(collection(db, "treatments"), {
+      animal: form.animal,
+      condition: form.condition,
+      medicine: form.medicine,
+      date: form.date,
+      status: form.status,
+      createdAt: serverTimestamp(),
+    });
 
-    setTreatments([...treatments, newTreatment]);
     setForm({ animal: "", condition: "", medicine: "", date: "", status: "Ongoing" });
   };
 
-  const handleDelete = (id) => {
-    setTreatments(treatments.filter((t) => t.id !== id));
+  const handleDelete = async (id) => {
+    await deleteDoc(doc(db, "treatments", id));
   };
 
   const statusColor = (status) =>
@@ -50,7 +72,6 @@ const Treatments = () => {
         <main className="p-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Treatments</h1>
 
-          {/* Add Treatment Form */}
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Add New Treatment</h2>
             <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -103,10 +124,11 @@ const Treatments = () => {
             </form>
           </div>
 
-          {/* Treatments Table */}
           <div className="bg-white rounded-xl shadow p-6 overflow-x-auto">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Treatment Records</h2>
-            {treatments.length === 0 ? (
+            {loading ? (
+              <p className="text-gray-500">Loading...</p>
+            ) : treatments.length === 0 ? (
               <p className="text-gray-500">No treatment records yet.</p>
             ) : (
               <table className="min-w-full text-sm text-left">
@@ -125,7 +147,7 @@ const Treatments = () => {
                     <tr key={t.id} className="border-b last:border-0">
                       <td className="py-2 pr-4 font-medium text-gray-800">{t.animal}</td>
                       <td className="py-2 pr-4">{t.condition}</td>
-                      <td className="py-2 pr-4">{t.medicine || "—"}</td>
+                      <td className="py-2 pr-4">{t.medicine || "-"}</td>
                       <td className="py-2 pr-4">{t.date}</td>
                       <td className="py-2 pr-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusColor(t.status)}`}>
