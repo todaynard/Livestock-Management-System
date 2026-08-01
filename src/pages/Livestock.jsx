@@ -1,13 +1,20 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import { db } from "../firebase";
+import {
+  collection,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  serverTimestamp,
+} from "firebase/firestore";
 
 const Livestock = () => {
-  const [animals, setAnimals] = useState([
-    { id: 1, name: "Cow #12", type: "Cow", breed: "Friesian", age: 3, gender: "Female", health: "Healthy" },
-    { id: 2, name: "Goat #5", type: "Goat", breed: "Boer", age: 2, gender: "Male", health: "Under Treatment" },
-    { id: 3, name: "Sheep #9", type: "Sheep", breed: "Dorper", age: 1, gender: "Female", health: "Healthy" },
-  ]);
+  const [animals, setAnimals] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     name: "",
@@ -21,26 +28,47 @@ const Livestock = () => {
   const [search, setSearch] = useState("");
   const [editingId, setEditingId] = useState(null);
 
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, "animals"), (snapshot) => {
+      const data = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setAnimals(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.type) return;
 
     if (editingId) {
-      setAnimals(
-        animals.map((a) => (a.id === editingId ? { ...form, id: editingId, age: Number(form.age) } : a))
-      );
+      const animalRef = doc(db, "animals", editingId);
+      await updateDoc(animalRef, {
+        name: form.name,
+        type: form.type,
+        breed: form.breed,
+        age: Number(form.age),
+        gender: form.gender,
+        health: form.health,
+      });
       setEditingId(null);
     } else {
-      const newAnimal = {
-        id: animals.length ? animals[animals.length - 1].id + 1 : 1,
-        ...form,
+      await addDoc(collection(db, "animals"), {
+        name: form.name,
+        type: form.type,
+        breed: form.breed,
         age: Number(form.age),
-      };
-      setAnimals([...animals, newAnimal]);
+        gender: form.gender,
+        health: form.health,
+        createdAt: serverTimestamp(),
+      });
     }
 
     setForm({ name: "", type: "", breed: "", age: "", gender: "Female", health: "Healthy" });
@@ -51,8 +79,8 @@ const Livestock = () => {
     setEditingId(animal.id);
   };
 
-  const handleDelete = (id) => {
-    setAnimals(animals.filter((a) => a.id !== id));
+  const handleDelete = async (id) => {
+    await deleteDoc(doc(db, "animals", id));
     if (editingId === id) {
       setEditingId(null);
       setForm({ name: "", type: "", breed: "", age: "", gender: "Female", health: "Healthy" });
@@ -61,8 +89,8 @@ const Livestock = () => {
 
   const filteredAnimals = animals.filter(
     (a) =>
-      a.name.toLowerCase().includes(search.toLowerCase()) ||
-      a.type.toLowerCase().includes(search.toLowerCase())
+      (a.name || "").toLowerCase().includes(search.toLowerCase()) ||
+      (a.type || "").toLowerCase().includes(search.toLowerCase())
   );
 
   const healthColor = (health) =>
@@ -80,7 +108,6 @@ const Livestock = () => {
         <main className="p-6">
           <h1 className="text-3xl font-bold text-gray-800 mb-6">Livestock</h1>
 
-          {/* Add/Edit Animal Form */}
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
               {editingId ? "Edit Animal" : "Add New Animal"}
@@ -162,7 +189,6 @@ const Livestock = () => {
             </form>
           </div>
 
-          {/* Search */}
           <div className="mb-4">
             <input
               type="text"
@@ -173,12 +199,13 @@ const Livestock = () => {
             />
           </div>
 
-          {/* Livestock Table */}
           <div className="bg-white rounded-xl shadow p-6 overflow-x-auto">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">
               All Livestock ({filteredAnimals.length})
             </h2>
-            {filteredAnimals.length === 0 ? (
+            {loading ? (
+              <p className="text-gray-500">Loading...</p>
+            ) : filteredAnimals.length === 0 ? (
               <p className="text-gray-500">No animals found.</p>
             ) : (
               <table className="min-w-full text-sm text-left">
@@ -198,7 +225,7 @@ const Livestock = () => {
                     <tr key={a.id} className="border-b last:border-0">
                       <td className="py-2 pr-4 font-medium text-gray-800">{a.name}</td>
                       <td className="py-2 pr-4">{a.type}</td>
-                      <td className="py-2 pr-4">{a.breed || "—"}</td>
+                      <td className="py-2 pr-4">{a.breed || "-"}</td>
                       <td className="py-2 pr-4">{a.age}</td>
                       <td className="py-2 pr-4">{a.gender}</td>
                       <td className="py-2 pr-4">
