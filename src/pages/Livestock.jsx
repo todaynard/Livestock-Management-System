@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
-import { Link } from "react-router-dom";
-import { Link } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection,
@@ -14,13 +13,15 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 
+const ANIMAL_TYPES = ["Cow", "Goat", "Sheep", "Poultry", "Pig", "Other"];
+
 const Livestock = () => {
   const [animals, setAnimals] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [form, setForm] = useState({
     name: "",
-    type: "",
+    type: "Cow",
     breed: "",
     age: "",
     gender: "Female",
@@ -73,7 +74,7 @@ const Livestock = () => {
       });
     }
 
-    setForm({ name: "", type: "", breed: "", age: "", gender: "Female", health: "Healthy" });
+    setForm({ name: "", type: "Cow", breed: "", age: "", gender: "Female", health: "Healthy" });
   };
 
   const handleEdit = (animal) => {
@@ -85,7 +86,7 @@ const Livestock = () => {
     await deleteDoc(doc(db, "animals", id));
     if (editingId === id) {
       setEditingId(null);
-      setForm({ name: "", type: "", breed: "", age: "", gender: "Female", health: "Healthy" });
+      setForm({ name: "", type: "Cow", breed: "", age: "", gender: "Female", health: "Healthy" });
     }
   };
 
@@ -123,14 +124,16 @@ const Livestock = () => {
                 onChange={handleChange}
                 className="border rounded-lg px-3 py-2 text-sm"
               />
-              <input
-                type="text"
+              <select
                 name="type"
-                placeholder="Type (Cow, Goat...)"
                 value={form.type}
                 onChange={handleChange}
                 className="border rounded-lg px-3 py-2 text-sm"
-              />
+              >
+                {ANIMAL_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
               <input
                 type="text"
                 name="breed"
@@ -180,7 +183,7 @@ const Livestock = () => {
                     type="button"
                     onClick={() => {
                       setEditingId(null);
-                      setForm({ name: "", type: "", breed: "", age: "", gender: "Female", health: "Healthy" });
+                      setForm({ name: "", type: "Cow", breed: "", age: "", gender: "Female", health: "Healthy" });
                     }}
                     className="bg-gray-200 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-300"
                   >
@@ -236,7 +239,6 @@ const Livestock = () => {
                         </span>
                       </td>
                       <td className="py-2 pr-4 flex gap-3">
-                        <Link to={`/animal/${a.id}`} className="text-green-600 hover:underline text-xs">View</Link>
                         <Link to={`/animal/${a.id}`} className="text-green-600 hover:underline text-xs">View</Link>
                         <button
                           onClick={() => handleEdit(a)}
