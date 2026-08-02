@@ -1,6 +1,8 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import { Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { db } from "../firebase";
 import {
   collection,
@@ -234,6 +236,8 @@ const Livestock = () => {
                         </span>
                       </td>
                       <td className="py-2 pr-4 flex gap-3">
+                        <Link to={`/animal/${a.id}`} className="text-green-600 hover:underline text-xs">View</Link>
+                        <Link to={`/animal/${a.id}`} className="text-green-600 hover:underline text-xs">View</Link>
                         <button
                           onClick={() => handleEdit(a)}
                           className="text-blue-600 hover:underline text-xs"

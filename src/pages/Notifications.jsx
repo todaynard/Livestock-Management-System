@@ -1,53 +1,97 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import { db } from "../firebase";
+import { collection, onSnapshot } from "firebase/firestore";
+
+const STORAGE_KEY = "notification_status";
+
+const loadStatus = () => {
+  try {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+};
+
+const saveStatus = (status) => {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(status));
+};
 
 const Notifications = () => {
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: "Vaccination",
-      message: "Cow #12 is due for FMD vaccination on 2026-08-02.",
-      date: "2026-07-28",
-      read: false,
-    },
-    {
-      id: 2,
-      type: "Treatment",
-      message: "Goat #5 treatment for bloating is ongoing — follow-up needed.",
-      date: "2026-07-27",
-      read: false,
-    },
-    {
-      id: 3,
-      type: "Health",
-      message: "Sheep #9 health check completed — status: Healthy.",
-      date: "2026-07-25",
-      read: true,
-    },
-    {
-      id: 4,
-      type: "System",
-      message: "Monthly farm report is ready to view in Reports.",
-      date: "2026-07-24",
-      read: true,
-    },
-  ]);
-
+  const [vaccinations, setVaccinations] = useState([]);
+  const [treatments, setTreatments] = useState([]);
+  const [healthRecords, setHealthRecords] = useState([]);
+  const [status, setStatus] = useState(loadStatus());
   const [filter, setFilter] = useState("All");
 
-  const markAsRead = (id) => {
-    setNotifications(
-      notifications.map((n) => (n.id === id ? { ...n, read: true } : n))
+  useEffect(() => {
+    const unsubVax = onSnapshot(collection(db, "vaccinations"), (snap) =>
+      setVaccinations(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
     );
+    const unsubTreat = onSnapshot(collection(db, "treatments"), (snap) =>
+      setTreatments(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    const unsubHealth = onSnapshot(collection(db, "healthRecords"), (snap) =>
+      setHealthRecords(snap.docs.map((d) => ({ id: d.id, ...d.data() })))
+    );
+    return () => {
+      unsubVax();
+      unsubTreat();
+      unsubHealth();
+    };
+  }, []);
+
+  const generated = [
+    ...vaccinations
+      .filter((v) => v.status === "Upcoming")
+      .map((v) => ({
+        id: `vax-${v.id}`,
+        type: "Vaccination",
+        message: `${v.animal} is due for ${v.vaccine} on ${v.nextDate || "an upcoming date"}.`,
+        date: v.dateGiven || "",
+      })),
+    ...treatments
+      .filter((t) => t.status === "Ongoing")
+      .map((t) => ({
+        id: `treat-${t.id}`,
+        type: "Treatment",
+        message: `${t.animal} treatment for ${t.condition} is ongoing — follow-up needed.`,
+        date: t.date || "",
+      })),
+    ...healthRecords
+      .filter((h) => h.status === "Attention Needed" || h.status === "Critical")
+      .map((h) => ({
+        id: `health-${h.id}`,
+        type: "Health",
+        message: `${h.animal} health check flagged: ${h.status}.`,
+        date: h.checkupDate || "",
+      })),
+  ];
+
+  const notifications = generated
+    .filter((n) => !status[n.id]?.dismissed)
+    .map((n) => ({ ...n, read: !!status[n.id]?.read }));
+
+  const markAsRead = (id) => {
+    const next = { ...status, [id]: { ...status[id], read: true } };
+    setStatus(next);
+    saveStatus(next);
   };
 
   const markAllAsRead = () => {
-    setNotifications(notifications.map((n) => ({ ...n, read: true })));
+    const next = { ...status };
+    generated.forEach((n) => {
+      next[n.id] = { ...next[n.id], read: true };
+    });
+    setStatus(next);
+    saveStatus(next);
   };
 
   const dismiss = (id) => {
-    setNotifications(notifications.filter((n) => n.id !== id));
+    const next = { ...status, [id]: { ...status[id], dismissed: true } };
+    setStatus(next);
+    saveStatus(next);
   };
 
   const typeColor = (type) => {
@@ -92,9 +136,8 @@ const Notifications = () => {
             </button>
           </div>
 
-          {/* Filter tabs */}
           <div className="flex gap-2 mb-6 flex-wrap">
-            {["All", "Unread", "Vaccination", "Treatment", "Health", "System"].map((f) => (
+            {["All", "Unread", "Vaccination", "Treatment", "Health"].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
@@ -109,7 +152,6 @@ const Notifications = () => {
             ))}
           </div>
 
-          {/* Notification list */}
           <div className="bg-white rounded-xl shadow divide-y">
             {filteredNotifications.length === 0 ? (
               <p className="text-gray-500 p-6">No notifications to show.</p>
@@ -131,7 +173,7 @@ const Notifications = () => {
                       )}
                     </div>
                     <p className="text-gray-800 text-sm">{n.message}</p>
-                    <p className="text-gray-400 text-xs mt-1">{n.date}</p>
+                    {n.date && <p className="text-gray-400 text-xs mt-1">{n.date}</p>}
                   </div>
                   <div className="flex flex-col gap-2 text-xs">
                     {!n.read && (

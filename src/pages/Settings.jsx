@@ -1,13 +1,20 @@
-import React, { useState } from "react";
+﻿import React, { useState, useEffect } from "react";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import { auth, db } from "../firebase";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import {
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  updatePassword,
+} from "firebase/auth";
 
 const Settings = () => {
   const [farmInfo, setFarmInfo] = useState({
-    farmName: "Green Valley Farm",
-    ownerName: "Farmer",
-    location: "Nairobi, Kenya",
-    contact: "0712 345 678",
+    farmName: "",
+    ownerName: "",
+    location: "",
+    contact: "",
   });
 
   const [preferences, setPreferences] = useState({
@@ -24,6 +31,32 @@ const Settings = () => {
   });
 
   const [savedMessage, setSavedMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [loadingProfile, setLoadingProfile] = useState(true);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      const user = auth.currentUser;
+      if (!user) {
+        setLoadingProfile(false);
+        return;
+      }
+      try {
+        const profileRef = doc(db, "farmProfiles", user.uid);
+        const snap = await getDoc(profileRef);
+        if (snap.exists()) {
+          setFarmInfo(snap.data());
+        } else {
+          setFarmInfo({ farmName: "", ownerName: "", location: "", contact: "" });
+        }
+      } catch (err) {
+        // no profile yet, leave blank
+      } finally {
+        setLoadingProfile(false);
+      }
+    };
+    loadProfile();
+  }, []);
 
   const handleFarmInfoChange = (e) => {
     setFarmInfo({ ...farmInfo, [e.target.name]: e.target.value });
@@ -39,23 +72,65 @@ const Settings = () => {
 
   const showSaved = (label) => {
     setSavedMessage(label);
-    setTimeout(() => setSavedMessage(""), 2500);
+    setErrorMessage("");
+    setTimeout(() => setSavedMessage(""), 3000);
   };
 
-  const handleFarmInfoSubmit = (e) => {
-    e.preventDefault();
-    showSaved("Farm profile updated successfully.");
+  const showError = (label) => {
+    setErrorMessage(label);
+    setSavedMessage("");
+    setTimeout(() => setErrorMessage(""), 4000);
   };
 
-  const handlePasswordSubmit = (e) => {
+  const handleFarmInfoSubmit = async (e) => {
     e.preventDefault();
-    if (!password.current || !password.newPassword) return;
-    if (password.newPassword !== password.confirm) {
-      showSaved("Passwords do not match.");
+    const user = auth.currentUser;
+    if (!user) {
+      showError("You must be logged in to save your profile.");
       return;
     }
-    setPassword({ current: "", newPassword: "", confirm: "" });
-    showSaved("Password updated successfully.");
+    try {
+      await setDoc(doc(db, "farmProfiles", user.uid), farmInfo);
+      showSaved("Farm profile updated successfully.");
+    } catch (err) {
+      showError("Failed to save farm profile. Please try again.");
+    }
+  };
+
+  const handlePasswordSubmit = async (e) => {
+    e.preventDefault();
+    const user = auth.currentUser;
+
+    if (!user) {
+      showError("You must be logged in to change your password.");
+      return;
+    }
+    if (!password.current || !password.newPassword) {
+      showError("Please fill in all password fields.");
+      return;
+    }
+    if (password.newPassword !== password.confirm) {
+      showError("New passwords do not match.");
+      return;
+    }
+    if (password.newPassword.length < 6) {
+      showError("New password must be at least 6 characters.");
+      return;
+    }
+
+    try {
+      const credential = EmailAuthProvider.credential(user.email, password.current);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, password.newPassword);
+      setPassword({ current: "", newPassword: "", confirm: "" });
+      showSaved("Password updated successfully.");
+    } catch (err) {
+      if (err.code === "auth/wrong-password" || err.code === "auth/invalid-credential") {
+        showError("Current password is incorrect.");
+      } else {
+        showError("Failed to update password. Please try again.");
+      }
+    }
   };
 
   return (
@@ -71,63 +146,70 @@ const Settings = () => {
               {savedMessage}
             </div>
           )}
+          {errorMessage && (
+            <div className="bg-red-100 text-red-700 text-sm px-4 py-2 rounded-lg mb-4">
+              {errorMessage}
+            </div>
+          )}
 
-          {/* Farm Profile */}
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Farm Profile</h2>
-            <form onSubmit={handleFarmInfoSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Farm Name</label>
-                <input
-                  type="text"
-                  name="farmName"
-                  value={farmInfo.farmName}
-                  onChange={handleFarmInfoChange}
-                  className="border rounded-lg px-3 py-2 text-sm w-full"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Owner Name</label>
-                <input
-                  type="text"
-                  name="ownerName"
-                  value={farmInfo.ownerName}
-                  onChange={handleFarmInfoChange}
-                  className="border rounded-lg px-3 py-2 text-sm w-full"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Location</label>
-                <input
-                  type="text"
-                  name="location"
-                  value={farmInfo.location}
-                  onChange={handleFarmInfoChange}
-                  className="border rounded-lg px-3 py-2 text-sm w-full"
-                />
-              </div>
-              <div>
-                <label className="text-sm text-gray-600 block mb-1">Contact Number</label>
-                <input
-                  type="text"
-                  name="contact"
-                  value={farmInfo.contact}
-                  onChange={handleFarmInfoChange}
-                  className="border rounded-lg px-3 py-2 text-sm w-full"
-                />
-              </div>
-              <div className="sm:col-span-2">
-                <button
-                  type="submit"
-                  className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Save Profile
-                </button>
-              </div>
-            </form>
+            {loadingProfile ? (
+              <p className="text-gray-500 text-sm">Loading...</p>
+            ) : (
+              <form onSubmit={handleFarmInfoSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">Farm Name</label>
+                  <input
+                    type="text"
+                    name="farmName"
+                    value={farmInfo.farmName}
+                    onChange={handleFarmInfoChange}
+                    className="border rounded-lg px-3 py-2 text-sm w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">Owner Name</label>
+                  <input
+                    type="text"
+                    name="ownerName"
+                    value={farmInfo.ownerName}
+                    onChange={handleFarmInfoChange}
+                    className="border rounded-lg px-3 py-2 text-sm w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">Location</label>
+                  <input
+                    type="text"
+                    name="location"
+                    value={farmInfo.location}
+                    onChange={handleFarmInfoChange}
+                    className="border rounded-lg px-3 py-2 text-sm w-full"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-600 block mb-1">Contact Number</label>
+                  <input
+                    type="text"
+                    name="contact"
+                    value={farmInfo.contact}
+                    onChange={handleFarmInfoChange}
+                    className="border rounded-lg px-3 py-2 text-sm w-full"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                  >
+                    Save Profile
+                  </button>
+                </div>
+              </form>
+            )}
           </div>
 
-          {/* Notification Preferences */}
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Preferences</h2>
             <div className="space-y-4">
@@ -150,9 +232,11 @@ const Settings = () => {
                 </div>
               ))}
             </div>
+            <p className="text-xs text-gray-400 mt-4">
+              Note: these preferences are not yet wired to real features.
+            </p>
           </div>
 
-          {/* Change Password */}
           <div className="bg-white rounded-xl shadow p-6">
             <h2 className="text-lg font-semibold text-gray-800 mb-4">Change Password</h2>
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
